@@ -32,16 +32,10 @@ def generate_camera_matrix(chessboard_patten=(6, 8), pattern_folder="chessboard_
     images = p.glob('*.jpg')
     success = 0
     failure = 0
-    tst = 0
 
     for fname in images:
         img = cv2.imread(str(fname))
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # grayscale image
-
-        if tst < 1:
-            print("Color image size: ", img.shape)
-            print("Grayscale image shape: ", gray.shape)
-            tst += 1
 
         # Find the chess board corners
         ret, corners = cv2.findChessboardCorners(gray, (vpts, hpts), None)
@@ -81,7 +75,12 @@ def generate_camera_matrix(chessboard_patten=(6, 8), pattern_folder="chessboard_
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    ret, matrix, distortion, r_vecs, t_vecs = generate_camera_matrix(show=False)
+    save_matrix = False
+    save_matrix_ext = 'v0'  # jan 13
+    ret, matrix, distortion, r_vecs, t_vecs = generate_camera_matrix(show=False, save=False)
+
+    print("ret:")
+    print(ret)
 
     print(" Camera matrix:")
     print(matrix)
@@ -94,3 +93,7 @@ if __name__ == '__main__':
 
     print("\n Translation Vectors:")
     print(t_vecs)
+
+    if save_matrix:
+        np.savez('camera_matrix' + save_matrix_ext, ret=ret, matrix=matrix,distortion=distortion, r_vecs=r_vecs,
+                 t_vecs=t_vecs)

@@ -1,3 +1,6 @@
 # created by virtualenv automatically
 /venv/*
 /chessboard_images
+/block_image
+*.png
+.idea/
