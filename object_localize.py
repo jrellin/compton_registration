@@ -119,12 +119,21 @@ def objectiveFunction(x, targetmask, camera_matrix, dist_coeffs):
 
 
 # Main Method
-def find_rot_and_trans(object_pic_filename):
+def find_rot_and_trans(object_pic_filename,
+                       camera_matrix,
+                       dist_coeffs,
+                       r0=np.array([0, np.pi/2, 0]),
+                       tz0=10,
+                       camera_fov_degrees=np.array([54.0, 44.0])  # Horizontal x Vertical
+                       ):
+
+    if r0.size != 3:
+        raise ValueError("{r} does not contain 3 components!".format(r=r0))
+    # initial_guess = np.hstack([r0, t0])
+
     # Load captured image.
     image_bgr = cv2.imread(object_pic_filename, cv2.IMREAD_COLOR)
 
-    # cv2.imshow('image_bgr', image_bgr) # test
-    # cv2.waitKey(20000)
     # Convert to HSV color space.
     image_hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
 
@@ -135,8 +144,6 @@ def find_rot_and_trans(object_pic_filename):
     # to convert from website to opencv: H/2, S * 2.55, V * 2.55
     mask = cv2.inRange(image_hsv, YELLOW["lower"], YELLOW["upper"])
 
-    # cv2.imshow('mask', mask) # test
-    # cv2.waitKey(20000)
     print("Number of non-zeros: ", np.count_nonzero(mask))
 
     mask = cv2.morphologyEx(
@@ -149,18 +156,44 @@ def find_rot_and_trans(object_pic_filename):
         mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]  # This had to be fixed
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
     cv2.drawContours(image_bgr, contours, 0, (255, 255, 255), 3)
+
     targetmask = np.zeros((image_bgr.shape[0], image_bgr.shape[1], 1), np.uint8)
     cv2.drawContours(targetmask, contours, 0, (255), -1)
+
+    # Setting initial guess in x and y based on moments from masked image
+    x_fov_dist = tz0 * 2 * np.tan(np.deg2rad(camera_fov_degrees[0]/2.0))
+    y_fov_dist = tz0 * 2 * np.tan(np.deg2rad(camera_fov_degrees[1]/2.0))
+
+    Moments = cv2.moments(targetmask)
+    x = int(Moments["m10"] / Moments["m00"])
+    y = int(Moments["m01"] / Moments["m00"])
+
+    tx0 = ((x/targetmask.shape[1]) - 0.5) * x_fov_dist
+    ty0 = ((y/targetmask.shape[0]) - 0.5) * y_fov_dist
+    t0 = np.array([tx0, ty0, tz0])
+
+    initial_guess = np.hstack([r0, t0])
 
     # cv2.imshow('target_mask', targetmask)
     # cv2.waitKey(20000)
 
     # 1.5 inches x 1.5 inches x 3 inches
 
+    result = scipy.optimize.minimize(objectiveFunction,
+                                     initial_guess,
+                                     args=(targetmask, camera_matrix, dist_coeffs),
+                                     bounds=((-np.pi, np.pi), (-np.pi, np.pi), (-np.pi, np.pi),
+                                             (None, None), (None, None), (None, None)),
+                                     method='Nelder-Mead')
+    fit = result.x
+    print("Fit: ", fit)
+    print("Success: ", result.success)
+    print("Termination Message: ", result.message)
+
 
 def test_initial_guess(img_fname, cm, dist_coeffs,
                        box_size=(1.5, 1.5, 3),
-                       r0=np.array([0, np.pi/2, 0]),
+                       r0=np.array([0, np.pi/2, 0]),  # guess 0 -> r0=np.array([0, np.pi/2, 0]), no_rot -> 0, np.pi, 0
                        t0=np.array([0, 0, 10.])):
     image = cv2.imread(img_fname, cv2.IMREAD_COLOR)
     proj_img = drawBoxOnImage(r0, t0, cm, dist_coeffs, image, box_size=box_size)
@@ -182,8 +215,12 @@ def main():
     cm = vals['matrix']
     dist_coeffs = vals['distortion']
 
-    # find_rot_and_trans(img_fname)
-    test_initial_guess(img_fname, cm, dist_coeffs)
+    # find_rot_and_trans(img_fname, cm, dist_coeffs)  # for finding optimal rotation and translation guesses
+    # test_initial_guess(img_fname, cm, dist_coeffs)  # For testing and displaying guesses
+
+    test_initial_guess(img_fname, cm, dist_coeffs,
+                       r0=np.array([-3.59663312e-05,  1.58933175e+00, -6.50127592e-05]),
+                       t0=np.array([4.15431271e-02, 2.61365716e+00,  9.76298922e+00]))  # if t guess is (0, 3, 10)
 
 
 if __name__ == '__main__':

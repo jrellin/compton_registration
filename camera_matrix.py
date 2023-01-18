@@ -95,5 +95,5 @@ if __name__ == '__main__':
     print(t_vecs)
 
     if save_matrix:
-        np.savez('camera_matrix' + save_matrix_ext, ret=ret, matrix=matrix,distortion=distortion, r_vecs=r_vecs,
+        np.savez('camera_matrix' + save_matrix_ext, ret=ret, matrix=matrix, distortion=distortion, r_vecs=r_vecs,
                  t_vecs=t_vecs)
